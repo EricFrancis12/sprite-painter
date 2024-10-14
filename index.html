@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        #board {
+            display: inline-grid;
+        }
+
+        .block {
+            height: 8px;
+            width: 8px;
+            border: solid black 1px;
+        }
+
+        .block.empty {
+            background-color: grey;
+        }
+
+        .block.filled {
+            background-color: blue;
+        }
+    </style>
+
+</head>
+
+<body>
+    <diV id="board">
+
+    </diV>
+
+    <script>
+        const height = 64;
+        const width = 64;
+
+        const blocks = [];
+        for (let i = 0; i < height; i++) {
+            const row = [];
+            for (let j = 0; j < width; j++) {
+                row.push("#");
+            }
+            blocks.push(row);
+        }
+
+        const tunneler = {
+            count: 1000,
+            padding: 1,
+            x: Math.ceil(width / 2),
+            y: Math.ceil(height / 2),
+        };
+
+        while (tunneler.count >= 0) {
+            blocks[tunneler.y][tunneler.x] = "";
+
+            const roll = randomIntBetween(1, 4);
+            if (roll === 1 && tunneler.x > tunneler.padding) {
+                tunneler.x -= 1;
+            }
+            if (roll === 2 && tunneler.x < width - 1 - tunneler.padding) {
+                tunneler.x += 1;
+            }
+            if (roll === 3 && tunneler.y > tunneler.padding) {
+                tunneler.y -= 1;
+            }
+            if (roll === 4 && tunneler.y < height - 1 - tunneler.padding) {
+                tunneler.y += 1;
+            }
+
+            tunneler.count -= 1;
+        }
+
+        const boardEle = document.getElementById("board");
+
+        boardEle.style.gridTemplateColumns = `repeat(${width}, 1fr)`;
+
+        blocks.flat().forEach(block => {
+            let blockEle = `<div class="block empty"></div>`;
+            if (block === "#") {
+                blockEle = `<div class="block filled"></div>`;
+            }
+
+            boardEle.insertAdjacentHTML("beforeend", blockEle);
+        });
+
+        function randomIntBetween(min, max) {
+            min = Math.floor(min);
+            max = Math.ceil(max);
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+    </script>
+
+</body>
+
+</html>
