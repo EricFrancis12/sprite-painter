@@ -53,7 +53,7 @@
 
         const tunneler = {
             count: 1000,
-            padding: 1,
+            padding: 2,
             x: Math.ceil(width / 2),
             y: Math.ceil(height / 2),
         };
@@ -65,7 +65,7 @@
             if (roll === 1 && tunneler.x > tunneler.padding) {
                 tunneler.x -= 1;
             }
-            if (roll === 2 && tunneler.x < width - 1 - tunneler.padding) {
+            if (roll === 2 && tunneler.x < width - 1 - tunneler.padding - Math.ceil(width / 2)) {
                 tunneler.x += 1;
             }
             if (roll === 3 && tunneler.y > tunneler.padding) {
@@ -82,7 +82,18 @@
 
         boardEle.style.gridTemplateColumns = `repeat(${width}, 1fr)`;
 
-        blocks.flat().forEach(block => {
+        const symBlocks = blocks.map(row => {
+            const newRow = [];
+            for (let i = 0; i < Math.ceil(width / 2); i++) {
+                newRow.push(row[i]);
+            }
+            for (let i = 0; i < Math.ceil(width / 2); i++) {
+                newRow.push(row.at(-i - Math.ceil(width / 2)));
+            }
+            return newRow;
+        });
+
+        symBlocks.flat().forEach(block => {
             let blockEle = `<div class="block empty"></div>`;
             if (block === "#") {
                 blockEle = `<div class="block filled"></div>`;
