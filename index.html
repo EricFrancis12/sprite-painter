@@ -51,14 +51,9 @@
         const width = 82;
         const padding = 2;
 
-        const blocks = [];
-        for (let i = 0; i < height; i++) {
-            const row = [];
-            for (let j = 0; j < width; j++) {
-                row.push("");
-            }
-            blocks.push(row);
-        }
+        const boardEle = document.getElementById("board");
+
+        boardEle.style.gridTemplateColumns = `repeat(${width}, 1fr)`;
 
         const painters = [
             {
@@ -78,31 +73,22 @@
             },
         ];
 
-        for (const painter of painters) {
-            while (painter.count >= 0) {
-                blocks[painter.y][painter.x] = "#";
+        const dlas = [
+            {
+                x: Math.ceil(width / 2),
+                y: Math.ceil(height * 2 / 5),
+                count: 1000,
+            },
+            {
+                x: Math.ceil(width / 2),
+                y: Math.ceil(height * 4 / 5),
+                count: 1200,
+            },
+        ];
 
-                const roll = randomIntBetween(1, 4);
-                if (roll === 1 && painter.x > padding) {
-                    painter.x -= 1;
-                }
-                if (roll === 2 && painter.x < width - 1 - padding - Math.ceil(width / 2)) {
-                    painter.x += 1;
-                }
-                if (roll === 3 && painter.y > padding + 1) {
-                    painter.y -= 1;
-                }
-                if (roll === 4 && painter.y < height - 2 - padding) {
-                    painter.y += 1;
-                }
-
-                painter.count -= 1;
-            }
-        }
-
-        const boardEle = document.getElementById("board");
-
-        boardEle.style.gridTemplateColumns = `repeat(${width}, 1fr)`;
+        const blocks = blocksFromPainters(painters);
+        // const blocks = blocksFromDLA(dlas);
+        // const blocks = blocksFromCWL(100);
 
         let symBlocks = blocks.map(row => {
             const newRow = [];
@@ -213,6 +199,130 @@
 
             boardEle.insertAdjacentHTML("beforeend", blockEle);
         });
+
+        function blocksFromPainters(painters) {
+            const blocks = makeBlocks();
+
+            for (const painter of painters) {
+                while (painter.count >= 0) {
+                    blocks[painter.y][painter.x] = "#";
+
+                    const roll = randomIntBetween(1, 4);
+                    if (roll === 1 && painter.x > padding) {
+                        painter.x -= 1;
+                    }
+                    if (roll === 2 && painter.x < width - 1 - padding - Math.ceil(width / 2)) {
+                        painter.x += 1;
+                    }
+                    if (roll === 3 && painter.y > padding + 1) {
+                        painter.y -= 1;
+                    }
+                    if (roll === 4 && painter.y < height - 2 - padding) {
+                        painter.y += 1;
+                    }
+
+                    painter.count -= 1;
+                }
+            }
+
+            return blocks;
+        }
+
+        // Diffusion limited aggregation
+        function blocksFromDLA(dlas) {
+            const blocks = makeBlocks();
+
+            for (let dla of dlas) {
+                if (blocks[dla.y]?.[dla.x] === undefined) {
+                    continue;
+                }
+
+                blocks[dla.y][dla.x] = "#";
+
+                while (dla.count > 0) {
+                    let x = randomIntBetween(padding + 1, height - padding);
+                    let y = randomIntBetween(padding + 1, width - padding);
+
+                    if (blocks[y]?.[x] === undefined || blocks[y]?.[x] === "#") {
+                        continue;
+                    }
+
+                    const touchingFilledBlock = blocks[y + 1]?.[x] === "#" || blocks[y - 1]?.[x] === "#" || blocks[y]?.[x + 1] === "#" || blocks[y]?.[x - 1] === "#";
+                    if (touchingFilledBlock) {
+                        blocks[y][x] = "#";
+                        dla.count--;
+                    }
+                }
+            }
+
+            return blocks;
+        }
+
+        // Conway's Game of Life
+        function blocksFromCWL(rounds) {
+            let blocks = makeBlocks((x, y) => {
+                if (x < padding - 1 || x > width - padding + 1 || y < padding + 1 || y > height - padding - 2) {
+                    return "";
+                }
+                return randomIntBetween(0, 1) === 0 ? "" : "#";
+            });
+
+            while (rounds > 0) {
+                const clone = structuredClone(blocks);
+
+                for (let y = padding + 1; y < height - padding - 1; y++) {
+                    const row = [];
+                    for (let x = padding + 1; x < width - padding - 1; x++) {
+                        if (clone[y]?.[x] === undefined) {
+                            continue;
+                        }
+
+                        const neis = [
+                            clone[y]?.[x + 1],
+                            clone[y]?.[x - 1],
+                            clone[y - 1]?.[x + 1],
+                            clone[y - 1]?.[x - 1],
+                            clone[y - 1]?.[x],
+                            clone[y + 1]?.[x + 1],
+                            clone[y + 1]?.[x - 1],
+                            clone[y + 1]?.[x],
+                        ];
+
+                        const numBlockNeis = neis.filter(nei => nei === "#").length;
+
+                        if (numBlockNeis === 0) {
+                            clone[y][x] = "";
+                        } else if (numBlockNeis <= 4) {
+                            clone[y][x] = "#";
+                        } else {
+                            clone[y][x] = "";
+                        }
+
+                        blocks = clone;
+                    }
+                }
+
+                rounds--;
+            }
+
+            return blocks;
+        }
+
+        function makeBlocks(val = "") {
+            const blocks = [];
+            for (let y = 0; y < height; y++) {
+                const row = [];
+                for (let x = 0; x < width; x++) {
+                    if (typeof val === "function") {
+                        row.push(val(x, y));
+                    } else {
+                        row.push(val);
+                    }
+                }
+                blocks.push(row);
+            }
+            return blocks;
+        }
 
         function randomIntBetween(min, max) {
             min = Math.floor(min);
