@@ -42,9 +42,9 @@
 </head>
 
 <body>
-    <diV id="board">
+    <div id="board"></div>
 
-    </diV>
+    <script src="/color-scheme.min.js"></script>
 
     <script>
         const height = 82;
@@ -54,6 +54,57 @@
         const boardEle = document.getElementById("board");
 
         boardEle.style.gridTemplateColumns = `repeat(${width}, 1fr)`;
+
+        let perlin = {
+            rand_vect: function () {
+                let theta = Math.random() * 2 * Math.PI;
+                return { x: Math.cos(theta), y: Math.sin(theta) };
+            },
+            dot_prod_grid: function (x, y, vx, vy) {
+                let g_vect;
+                let d_vect = { x: x - vx, y: y - vy };
+                if (this.gradients[[vx, vy]]) {
+                    g_vect = this.gradients[[vx, vy]];
+                } else {
+                    g_vect = this.rand_vect();
+                    this.gradients[[vx, vy]] = g_vect;
+                }
+                return d_vect.x * g_vect.x + d_vect.y * g_vect.y;
+            },
+            smootherstep: function (x) {
+                return 6 * x ** 5 - 15 * x ** 4 + 10 * x ** 3;
+            },
+            interp: function (x, a, b) {
+                return a + this.smootherstep(x) * (b - a);
+            },
+            seed: function () {
+                this.gradients = {};
+                this.memory = {};
+            },
+            get: function (x, y) {
+                if (this.memory.hasOwnProperty([x, y]))
+                    return this.memory[[x, y]];
+                let xf = Math.floor(x);
+                let yf = Math.floor(y);
+                //interpolate
+                let tl = this.dot_prod_grid(x, y, xf, yf);
+                let tr = this.dot_prod_grid(x, y, xf + 1, yf);
+                let bl = this.dot_prod_grid(x, y, xf, yf + 1);
+                let br = this.dot_prod_grid(x, y, xf + 1, yf + 1);
+                let xt = this.interp(x - xf, tl, tr);
+                let xb = this.interp(x - xf, bl, br);
+                let v = this.interp(y - yf, xt, xb);
+                this.memory[[x, y]] = v;
+                return v;
+            }
+        }
+        perlin.seed();
+
+        perlin.seed("123123");
+
+        const GRID_SIZE = 4;
+        const RESOLUTION = 128;
+        const COLOR_SCALE = 250;
 
         const painters = [
             {
@@ -185,20 +236,68 @@
             }
         }
 
-        symBlocks.flat().forEach(block => {
-            let blockEle = `<div class="block empty"></div>`;
-            if (block === "#") {
-                blockEle = `<div class="block painted"></div>`;
+        var scheme = new ColorScheme;
+        scheme.from_hue(randomIntBetween(0, 100))
+            .scheme('triade')
+            .variation('soft');
+
+        var colors = scheme.colors();
+
+        for (const color of colors) {
+            document.body.insertAdjacentHTML("beforeend", `<div style="height:50px; width:50px; background-color:#${color}"></div>`)
+        }
+
+        const coloredBlocks = symBlocks.map((row, y) => {
+            const newRow = structuredClone(row);
+
+            let leftX;
+            let rightX = newRow.length / 2;
+            if (newRow.length % 2 === 0) {
+                leftX = newRow.length / 2 - 1;
+            } else {
+                leftX = newRow.length / 2 - 2;
+
+                // Handle the center col if number of cols is odd
+                const centerX = newRow.length / 2 - 1;
+
+                const val = perlin.get(centerX + 0.5, y + 0.5);
+                const color = getItemFromArray(colors.slice(4, 8), (val + 1) / 2);
+
+                if (newRow[centerX] === "#") {
+                    newRow[centerX] = "#" + color;
+                }
             }
+
+            while (newRow[leftX] !== undefined && newRow[rightX] !== undefined) {
+                const val = perlin.get(rightX + 0.5, y + 0.5);
+                const color = getItemFromArray(colors.slice(4, 8), (val + 1) / 2);
+
+                if (newRow[leftX] === "#") {
+                    newRow[leftX] = "#" + color;
+                }
+                leftX--;
+
+                if (newRow[rightX] === "#") {
+                    newRow[rightX] = "#" + color;
+                }
+                rightX++;
+            }
+
+            return newRow;
+        });
+
+        coloredBlocks.forEach((row, y) => row.forEach((block, x) => {
+            let blockEle = `<div class="block empty"></div>`;
             if (block === "o") {
                 blockEle = `<div class="block outline"></div>`;
-            }
-            if (block === "?") {
+            } else if (block === "?") {
                 blockEle = `<div class="block question"></div>`;
+            } else if (block?.[0] === "#") {
+                blockEle = `<div class="block painted" style="background-color: ${block}"></div>`;
             }
 
             boardEle.insertAdjacentHTML("beforeend", blockEle);
-        });
+        }));
 
         function blocksFromPainters(painters) {
             const blocks = makeBlocks();
@@ -322,6 +421,34 @@
                 blocks.push(row);
             }
             return blocks;
+        }
+
+        // Using ideas from https://iquilezles.org/articles/palettes
+        function genColorScheme(t) {
+            const a = { r: randomIntBetween(0, 0.5), g: randomIntBetween(0, 0.5), b: randomIntBetween(0, 0.5) };
+            const b = { r: randomIntBetween(0.1, 0.6), g: randomIntBetween(0.1, 0.6), b: randomIntBetween(0.1, 0.6) };
+            const c = { r: randomIntBetween(0.15, 0.8), g: randomIntBetween(0.15, 0.8), b: randomIntBetween(0.15, 0.8) };
+            const d = { r: randomIntBetween(0, 1), g: randomIntBetween(0, 1), b: randomIntBetween(0, 1) };
+
+            const colors = [];
+            const n = t - 1;
+            for (let i = 0; i < t; i++) {
+                const color = {
+                    r: (a.r + b.r * Math.cos(2 * Math.PI * (c.r * (i / n) + d.r))) + (i / n) * 0.8,
+                    g: (a.g + b.g * Math.cos(2 * Math.PI * (c.g * (i / n) + d.g))) + (i / n) * 0.8,
+                    b: (a.b + b.b * Math.cos(2 * Math.PI * (c.b * (i / n) + d.b))) + (i / n) * 0.8,
+                };
+                colors.push(color);
+            }
+
+            return colors;
+        }
+
+        // value should be a number between 0 and 1
+        function getItemFromArray(arr, val) {
+            val = Math.max(0, Math.min(1, val));
+            const index = Math.floor(val * (arr.length - 1));
+            return arr[index];
         }
 
         function randomIntBetween(min, max) {
